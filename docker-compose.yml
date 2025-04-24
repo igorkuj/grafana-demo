@@ -1,0 +1,115 @@
+version: '3.7'
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.44.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:9.5.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-storage:/var/lib/grafana
+    environment:
+      - GF_UNIFIED_ALERTING_ENABLED=true
+      - GF_ALERTING_ENABLED=false
+    networks:
+      - monitoring
+
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager/config.yml:/etc/alertmanager/config.yml
+      - alertmanager-data:/data
+    restart: no
+    command: --config.file=/etc/alertmanager/config.yml --log.level=debug
+    networks:
+      - monitoring
+
+  loki:
+    image: grafana/loki:2.8.2
+    container_name: loki
+    user: root
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yml
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/local-config.yml:ro
+      - loki-data:/var/lib/loki
+    networks:
+      - monitoring
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1" ]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # First instance of Spring Boot application
+  grafana-demo-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: grafana-demo-1
+    ports:
+      - "8081:8080"
+    environment:
+      - SPRING_APPLICATION_NAME=Grafana Demo 1
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,prometheus
+      - DEPLOYMENT_HOST=dev
+      - TEST_CPU=run
+      - TEST_HTTP=run
+      - TEST_MEMORY=run
+    networks:
+      - monitoring
+    restart: always
+    depends_on:
+      loki:
+        condition: service_healthy
+
+  # Second instance of Spring Boot application
+  grafana-demo-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: grafana-demo-2
+    ports:
+      - "8082:8080"
+    environment:
+      - SPRING_APPLICATION_NAME=Grafana Demo 2
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,prometheus
+      - DEPLOYMENT_HOST=staging
+      - TEST_CPU=no
+      - TEST_HTTP=run
+      - TEST_MEMORY=no
+    networks:
+      - monitoring
+    restart: always
+    depends_on:
+      loki:
+        condition: service_healthy
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  grafana-storage:
+  alertmanager-data:
+  loki-data:

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration debug="true">
+
+    <!-- Expose DEPLOYMENT_HOST (or default to "dev") -->
+    <springProperty
+            scope="context"
+            name="deploymentHost"
+            source="DEPLOYMENT_HOST"
+            defaultValue="dev"/>
+
+    <!-- Include Spring Boot's default configuration -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- Console output -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} | %msg%n%wEx</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Loki appender -->
+    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+        </filter>
+        <http>
+            <url>http://loki:3100/loki/api/v1/push</url>
+        </http>
+        <format>
+            <label>
+                <!-- Use the springProperty we defined above -->
+                <pattern>app=spring-boot,host=${deploymentHost},level=%level,thread=%thread</pattern>
+            </label>
+            <message>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} | %msg%n%wEx</pattern>
+            </message>
+            <sortByTime>true</sortByTime>
+        </format>
+        <batchSize>100</batchSize>
+        <batchTimeoutMs>1000</batchTimeoutMs>
+    </appender>
+
+    <!-- Root logger configuration -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="LOKI" />
+    </root>
+
+    <!-- Application-specific loggers -->
+    <logger name="com.grafana.demo" level="DEBUG" />
+</configuration>

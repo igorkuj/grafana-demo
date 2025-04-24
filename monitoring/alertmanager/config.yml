@@ -1,0 +1,47 @@
+global:
+  resolve_timeout: 1m
+  # SMTP configuration (using Gmail as an example)
+  smtp_from: ""
+  smtp_smarthost: "smtp.gmail.com:587"
+  smtp_auth_username: ""
+  smtp_auth_password: ""  # Use an app password, not your regular password
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname', 'job']
+  repeat_interval: 4h
+  receiver: 'email-notifications'
+
+receivers:
+  - name: 'email-notifications'
+    email_configs:
+      - to: ""
+        send_resolved: true
+        html: |
+          {{ if eq .Status "firing" }}
+            <h1 style="color: #ff0000">🔥 ALERT FIRING: {{ .CommonLabels.alertname }}</h1>
+          {{ else }}
+            <h1 style="color: #00cc00">✅ ALERT RESOLVED: {{ .CommonLabels.alertname }}</h1>
+          {{ end }}
+          
+          <p><strong>Status:</strong> {{ .Status | toUpper }}</p>
+          
+          {{ range .Alerts }}
+            <h2>Alert: {{ .Labels.alertname }}</h2>
+            <p><strong>Severity:</strong> {{ .Labels.severity }}</p>
+            <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+            <h3>Details:</h3>
+            <ul>
+              {{ range .Labels.SortedPairs }}
+                <li><strong>{{ .Name }}:</strong> {{ .Value }}</li>
+              {{ end }}
+            </ul>
+            <hr />
+          {{ end }}
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']

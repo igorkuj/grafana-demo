@@ -1,0 +1,42 @@
+groups:
+  - name: SpringBootAlerts
+    rules:
+      # Alert for application 1 down
+      - alert: Application1Down
+        expr: up{application="grafana-demo-1"} == 0
+        for: 5s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Application instance grafana-demo-1 down"
+          description: "Spring Boot application instance grafana-demo-1 has been down for more than 5 seconds."
+
+      # Alert for application 2 down
+      - alert: Application2Down
+        expr: up{application="grafana-demo-2"} == 0
+        for: 5s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Application instance grafana-demo-1 down"
+          description: "Spring Boot application instance grafana-demo-2 has been down for more than 5 seconds."
+
+      # Alert for high CPU usage
+      - alert: HighCpuUsage1
+        expr: system_cpu_usage{application="grafana-demo-1"} > 0.8
+        for: 5s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "SpringBoot application grafana-demo-1 is using more than 80% CPU for more than 1 second."
+
+      # Alert for high CPU usage
+      - alert: HighCpuUsage2
+        expr: system_cpu_usage{application="grafana-demo-2"} > 0.8
+        for: 5s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "SpringBoot application grafana-demo-2 is using more than 80% CPU for more than 1 second."
